@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="bn" class="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSC ICT • অধ্যায় ৬ — SQL ডেটাবেজ সিমুলেটর</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;500;600;700&family=JetBrains+Mono:ital,wght@0,400;0,500;0,700;0,800;1,400&display=swap" rel="stylesheet">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- AlaSQL for genuine custom SQL execution alongside the educational simulator -->
+    <script src="https://cdn.jsdelivr.net/npm/alasql@4.4.0/dist/alasql.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Hind Siliguri"', 'sans-serif'],
+                        mono: ['"JetBrains Mono"', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        * {
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+        }
+        body {
+            background-color: #000000;
+            color: #ffffff;
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+        /* Minimal Dark Scrollbar */
+        ::-webkit-scrollbar {
+            width: 5px;
+            height: 5px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #09090b;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #27272a;
+            border-radius: 2px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #52525b;
+        }
+        /* Bit / Data Cell Styling from Design System */
+        .bit-cell {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 2.1rem;
+            height: 2.35rem;
+            padding: 0 0.5rem;
+            font-size: 0.88rem;
+            border-radius: 4px;
+            font-weight: 700;
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.05em;
+        }
+        @media (max-width: 640px) {
+            .bit-cell {
+                min-width: 1.75rem;
+                height: 2rem;
+                font-size: 0.78rem;
+            }
+        }
+        .code-block {
+            font-family: 'JetBrains Mono', monospace;
+            letter-spacing: 0.03em;
+            line-height: 1.6;
+        }
+        .sql-keyword {
+            font-weight: 800;
+            color: #ffffff;
+            text-decoration: underline;
+            text-decoration-color: #52525b;
+            text-underline-offset: 4px;
+        }
+    </style>
+</head>
+<body class="bg-black text-white selection:bg-white selection:text-black min-h-screen">
+
+    <main class="max-w-5xl mx-auto py-6 px-3 sm:px-6 lg:px-8 space-y-6">
+
+        <!-- UNIFIED TOP CARD: Header + Query Playground + Output -->
+        <section class="bg-[#0a0a0a] border border-neutral-800 rounded-xl p-5 sm:p-6 space-y-5">
+
+            <!-- Top Row: Badge & Author Info -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <span class="inline-flex items-center px-3 py-1 rounded-md bg-white text-black font-bold text-xs sm:text-sm tracking-wide">
+                    HSC ICT • অধ্যায় ৬
+                </span>
+                <div class="flex items-center gap-2 text-neutral-200 text-xs sm:text-sm font-medium">
+                    <span class="font-bold text-white">মোস্তফা কবির</span>
+                    <span class="text-neutral-600">•</span>
+                    <span class="font-mono text-neutral-300 tracking-wider">01944570784</span>
+                </div>
+            </div>
+
+            <!-- Title Row: Query Playground & Clear Button -->
+            <div class="flex items-center justify-between gap-2 pt-1">
+                <h1 class="text-xl sm:text-2xl font-bold text-white tracking-tight font-mono">
+                    Query Playground
+                </h1>
+                <button onclick="clearEditor()" class="px-3 py-1.5 bg-neutral-900 hover:bg-neutral-800 border border-neutral-700 rounded-lg text-xs font-mono text-neutral-300 hover:text-white transition">
+                    Clear
+                </button>
+            </div>
+
+            <!-- SQL Input Textarea -->
+            <div>
+                <textarea id="sql-editor-input" rows="6" spellcheck="false"
+                    class="w-full bg-neutral-900 border border-neutral-700 focus:border-white rounded-lg p-3.5 text-white font-mono text-sm sm:text-base outline-none transition code-block resize-y placeholder:text-neutral-600"
+                    placeholder="Write SQL query here..."></textarea>
+            </div>
+
+            <!-- Run Button -->
+            <div>
+                <button onclick="executeCurrentSQL()" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 py-3 bg-white text-black font-bold font-mono text-sm rounded-lg hover:bg-neutral-200 transition active:scale-[0.99]">
+                    <span>▶ Run Query</span>
+                </button>
+            </div>
+
+            <!-- Output Card -->
+            <div class="border-2 border-white bg-black rounded-xl p-4 sm:p-5 space-y-3">
+                <div class="border-b border-neutral-800 pb-2.5">
+                    <h2 class="text-sm sm:text-base font-bold text-white font-mono tracking-wide">Output</h2>
+                </div>
+
+                <!-- Dynamic Result Area -->
+                <div id="query-output-area" class="space-y-3">
+                    <div class="py-8 px-4 text-center border border-dashed border-neutral-800 rounded-lg text-xs sm:text-sm text-neutral-500">
+                        SQL কোড লিখে <span class="text-neutral-300 font-mono font-semibold">Run Query</span> বাটনে ক্লিক করলে এখানে ফলাফল দেখা যাবে।
+                    </div>
+                </div>
+            </div>
+
+        </section>
+
+    </main>
+
+    <script>
+        // Track columns of user-created tables so empty tables still display their structure clearly
+        let tableSchemas = {};
+
+        function initAlaSQLDatabase() {
+            try {
+                Object.keys(alasql.tables).forEach(t => {
+                    alasql(`DROP TABLE IF EXISTS [${t}]`);
+                });
+                tableSchemas = {};
+            } catch (e) {
+                console.error('DB Init Error:', e);
+            }
+        }
+
+        function buildMonochromeTableHTML(columns, rows) {
+            if (!columns || columns.length === 0) {
+                return '';
+            }
+
+            let html = `<div class="overflow-x-auto bg-black border border-neutral-800 rounded-lg p-2 sm:p-3">`;
+            html += `<table class="w-full border-collapse font-mono text-left text-xs sm:text-sm">`;
+            html += `<thead><tr class="border-b-2 border-neutral-700 bg-neutral-900/90">`;
+            columns.forEach(col => {
+                html += `<th class="py-2.5 px-3 font-bold text-white uppercase tracking-wider">${col}</th>`;
+            });
+            html += `</tr></thead><tbody>`;
+
+            if (!rows || rows.length === 0) {
+                html += `<tr class="border-b border-neutral-900">`;
+                columns.forEach(() => {
+                    html += `<td class="py-3 px-3 text-neutral-500 italic text-xs">(খালি)</td>`;
+                });
+                html += `</tr>`;
+            } else {
+                rows.forEach(row => {
+                    html += `<tr class="border-b border-neutral-900 hover:bg-neutral-900/40 transition">`;
+                    columns.forEach(col => {
+                        let val = row[col];
+                        if (val === undefined) {
+                            const cleanCol = col.includes('.') ? col.split('.')[1] : col;
+                            val = row[cleanCol] !== undefined ? row[cleanCol] : '';
+                        }
+                        const isNumeric = (typeof val === 'number' || (!isNaN(val) && val !== '' && val !== null));
+                        if (isNumeric && val !== '' && val !== null) {
+                            const formattedVal = (col === 'marks' && !String(val).includes('.')) ? Number(val).toFixed(1) : val;
+                            html += `<td class="py-2 px-3"><span class="bit-cell bg-neutral-900 text-white border border-neutral-700">${formattedVal}</span></td>`;
+                        } else {
+                            html += `<td class="py-2.5 px-3 text-neutral-200 font-medium">${val !== null && val !== undefined ? val : ''}</td>`;
+                        }
+                    });
+                    html += `</tr>`;
+                });
+            }
+
+            html += `</tbody></table></div>`;
+            return html;
+        }
+
+        function renderOutput(columns, rows, explanation) {
+            const outputArea = document.getElementById('query-output-area');
+            const tableHTML = buildMonochromeTableHTML(columns, rows);
+            outputArea.innerHTML = `
+                <div class="text-xs sm:text-sm text-neutral-300 bg-black border border-neutral-800 rounded-lg p-3 leading-relaxed">
+                    ${explanation}
+                </div>
+                ${tableHTML}
+            `;
+        }
+
+        function extractColumnsFromCreateSQL(stmt) {
+            const match = stmt.match(/CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([a-zA-Z0-9_\[\]]+)\s*\(([\s\S]*)\)/i);
+            if (!match) return null;
+            const tableName = match[1].replace(/[\[\]]/g, '');
+            const colsRaw = match[2].split(',');
+            const cols = colsRaw.map(c => c.trim().split(/\s+/)[0].replace(/[\[\]`"']/g, '')).filter(Boolean);
+            return { tableName, cols };
+        }
+
+        function validateStatementAndGetTable(stmt) {
+            const trimmed = stmt.trim();
+
+            // 1. Validate SELECT
+            if (/^SELECT\b/i.test(trimmed)) {
+                if (!/\bFROM\b/i.test(trimmed)) {
+                    throw new Error("SELECT কুয়েরিতে 'FROM' কি-ওয়ার্ডটি লেখা হয়নি। সঠিক নিয়ম: SELECT * FROM table_name;");
+                }
+                const fromMatch = trimmed.match(/\bFROM\s+([a-zA-Z0-9_\[\]\s,]+?)(?:\s+WHERE\b|\s+JOIN\b|\s+INNER\b|\s+LEFT\b|\s+ORDER\b|\s+GROUP\b|\s+LIMIT\b|$)/i);
+                if (!fromMatch || !fromMatch[1].trim()) {
+                    throw new Error("FROM-এর পরে টেবিলের নাম সঠিকভাবে লেখা হয়নি।");
+                }
+
+                // Extract all referenced tables (including comma-separated or JOIN tables)
+                const rawTables = fromMatch[1].split(',').map(t => t.trim().split(/\s+/)[0].replace(/[\[\]]/g, '')).filter(Boolean);
+                const joinMatches = [...trimmed.matchAll(/\bJOIN\s+([a-zA-Z0-9_\[\]]+)/gi)];
+                joinMatches.forEach(m => rawTables.push(m[1].replace(/[\[\]]/g, '')));
+
+                if (rawTables.length === 0) {
+                    throw new Error("টেবিলের নাম পাওয়া যায়নি।");
+                }
+
+                rawTables.forEach(tName => {
+                    if (!alasql.tables[tName]) {
+                        throw new Error(`'${tName}' নামের কোনো টেবিল ডেটাবেজে নেই। প্রথমে CREATE TABLE ${tName} (...) দিয়ে টেবিলটি তৈরি করুন।`);
+                    }
+                });
+
+                return rawTables[0];
+            }
+
+            // 2. Validate INSERT
+            if (/^INSERT\b/i.test(trimmed)) {
+                const match = trimmed.match(/^INSERT\s+INTO\s+([a-zA-Z0-9_\[\]]+)/i);
+                if (!match) {
+                    throw new Error("INSERT কুয়েরির গঠন সঠিক নয়। সঠিক নিয়ম: INSERT INTO table_name VALUES (...);");
+                }
+                const tName = match[1].replace(/[\[\]]/g, '');
+                if (!alasql.tables[tName]) {
+                    throw new Error(`'${tName}' নামের কোনো টেবিল ডেটাবেজে নেই। ডেটা যোগ করার আগে CREATE TABLE দিয়ে টেবিলটি তৈরি করুন।`);
+                }
+                return tName;
+            }
+
+            // 3. Validate UPDATE
+            if (/^UPDATE\b/i.test(trimmed)) {
+                const match = trimmed.match(/^UPDATE\s+([a-zA-Z0-9_\[\]]+)\s+SET\b/i);
+                if (!match) {
+                    throw new Error("UPDATE কুয়েরির গঠন সঠিক নয়। সঠিক নিয়ম: UPDATE table_name SET column = value WHERE ...;");
+                }
+                const tName = match[1].replace(/[\[\]]/g, '');
+                if (!alasql.tables[tName]) {
+                    throw new Error(`'${tName}' নামের কোনো টেবিল ডেটাবেজে নেই।`);
+                }
+                return tName;
+            }
+
+            // 4. Validate DELETE
+            if (/^DELETE\b/i.test(trimmed)) {
+                const match = trimmed.match(/^DELETE\s+FROM\s+([a-zA-Z0-9_\[\]]+)/i);
+                if (!match) {
+                    throw new Error("DELETE কুয়েরিতে 'FROM' বা টেবিলের নাম সঠিকভাবে লেখা হয়নি। সঠিক নিয়ম: DELETE FROM table_name WHERE ...;");
+                }
+                const tName = match[1].replace(/[\[\]]/g, '');
+                if (!alasql.tables[tName]) {
+                    throw new Error(`'${tName}' নামের কোনো টেবিল ডেটাবেজে নেই।`);
+                }
+                return tName;
+            }
+
+            throw new Error("অকার্যকর SQL কমান্ড। অনুগ্রহ করে CREATE TABLE, INSERT INTO, SELECT, UPDATE, DELETE অথবা DROP TABLE সঠিকভাবে লিখুন।");
+        }
+
+        function executeCurrentSQL() {
+            const rawSQL = document.getElementById('sql-editor-input').value.trim();
+            const outputArea = document.getElementById('query-output-area');
+
+            if (!rawSQL) {
+                outputArea.innerHTML = `
+                    <div class="p-4 text-center border border-dashed border-neutral-800 rounded-lg text-xs sm:text-sm text-neutral-400">
+                        অনুগ্রহ করে প্রথমে বক্সে একটি SQL কুয়েরি লিখুন।
+                    </div>
+                `;
+                return;
+            }
+
+            try {
+                // Remove single-line comments
+                const cleanSQL = rawSQL
+                    .split('\n')
+                    .map(line => line.replace(/--.*$/, ''))
+                    .join('\n')
+                    .trim();
+
+                // Escape reserved keyword `class` for AlaSQL compatibility
+                const safeSQL = cleanSQL.replace(/\bclass\b/gi, '[class]');
+                const statements = safeSQL.split(';').map(s => s.trim()).filter(Boolean);
+
+                let lastSelectRows = null;
+                let lastActionType = '';
+                let lastTargetTable = '';
+
+                statements.forEach(stmt => {
+                    // CREATE TABLE
+                    if (/^CREATE\s+TABLE\b/i.test(stmt)) {
+                        const parsed = extractColumnsFromCreateSQL(stmt);
+                        if (!parsed || parsed.cols.length === 0) {
+                            throw new Error("CREATE TABLE কুয়েরির গঠন সঠিক নয়। কলামের নাম ও ডেটা টাইপ বন্ধনীর ভেতরে সঠিকভাবে দিন।");
+                        }
+                        alasql(`DROP TABLE IF EXISTS [${parsed.tableName}]`);
+                        tableSchemas[parsed.tableName] = parsed.cols;
+                        lastTargetTable = parsed.tableName;
+                        alasql(stmt);
+                        lastActionType = 'CREATE';
+                    }
+                    // DROP TABLE
+                    else if (/^DROP\s+TABLE\b/i.test(stmt)) {
+                        const match = stmt.match(/^DROP\s+TABLE\s+(?:IF\s+EXISTS\s+)?([a-zA-Z0-9_\[\]]+)$/i);
+                        if (!match) {
+                            throw new Error("DROP TABLE কুয়েরির গঠন সঠিক নয়। সঠিক নিয়ম: DROP TABLE table_name;");
+                        }
+                        lastTargetTable = match[1].replace(/[\[\]]/g, '');
+                        if (!alasql.tables[lastTargetTable]) {
+                            throw new Error(`'${lastTargetTable}' নামের কোনো টেবিল ডেটাবেজে নেই।`);
+                        }
+                        alasql(`DROP TABLE IF EXISTS [${lastTargetTable}]`);
+                        delete tableSchemas[lastTargetTable];
+                        lastActionType = 'DROP';
+                    }
+                    // INSERT / UPDATE / DELETE / SELECT
+                    else {
+                        lastTargetTable = validateStatementAndGetTable(stmt);
+
+                        const res = alasql(stmt);
+                        if (/^SELECT\b/i.test(stmt)) {
+                            lastSelectRows = Array.isArray(res) ? res : [];
+                            lastActionType = 'SELECT';
+                        } else if (/^INSERT\b/i.test(stmt)) {
+                            lastActionType = 'INSERT';
+                        } else if (/^UPDATE\b/i.test(stmt)) {
+                            lastActionType = 'UPDATE';
+                        } else if (/^DELETE\b/i.test(stmt)) {
+                            lastActionType = 'DELETE';
+                        }
+                    }
+                });
+
+                // Render output based on the executed SQL
+                if (lastActionType === 'SELECT' && lastSelectRows !== null) {
+                    const cols = lastSelectRows.length > 0
+                        ? Object.keys(lastSelectRows[0])
+                        : (tableSchemas[lastTargetTable] || []);
+
+                    renderOutput(
+                        cols,
+                        lastSelectRows,
+                        `ফলাফল (${lastSelectRows.length}টি রেকর্ড):`
+                    );
+                } else if (lastActionType === 'CREATE') {
+                    const cols = tableSchemas[lastTargetTable] || [];
+                    renderOutput(
+                        cols,
+                        [],
+                        `'${lastTargetTable}' নামের নতুন খালি টেবিল তৈরি হয়েছে।`
+                    );
+                } else if (lastActionType === 'DROP') {
+                    outputArea.innerHTML = `
+                        <div class="p-4 text-center border border-dashed border-neutral-700 rounded-lg text-xs sm:text-sm text-neutral-300">
+                            <span class="font-mono font-bold text-white">${lastTargetTable}</span> টেবিলটি সম্পূর্ণ মুছে ফেলা হয়েছে।
+                        </div>
+                    `;
+                } else if (['INSERT', 'UPDATE', 'DELETE'].includes(lastActionType)) {
+                    const updatedRows = alasql(`SELECT * FROM [${lastTargetTable}]`);
+                    const cols = updatedRows.length > 0
+                        ? Object.keys(updatedRows[0])
+                        : (tableSchemas[lastTargetTable] || []);
+
+                    const actionMsg = lastActionType === 'INSERT'
+                        ? `'${lastTargetTable}' টেবিলে নতুন রেকর্ড যোগ হয়েছে:`
+                        : lastActionType === 'UPDATE'
+                            ? `'${lastTargetTable}' টেবিলের তথ্য হালনাগাদ (UPDATE) হয়েছে:`
+                            : `'${lastTargetTable}' টেবিল থেকে রেকর্ড মুছে ফেলা (DELETE) হয়েছে:`;
+
+                    renderOutput(cols, updatedRows, actionMsg);
+                }
+            } catch (err) {
+                const customMessage = err && err.message && /[\u0980-\u09FF]/.test(err.message)
+                    ? err.message
+                    : "আপনার লেখা SQL কোডের বানান বা সিনট্যাক্সে ভুল রয়েছে। অনুগ্রহ করে কোডটি যাচাই করুন।";
+
+                outputArea.innerHTML = `
+                    <div class="text-xs sm:text-sm text-neutral-300 bg-black border border-neutral-700 rounded-lg p-3.5 leading-relaxed">
+                        <span class="font-bold text-white">ত্রুটি:</span> ${customMessage}
+                    </div>
+                `;
+            }
+        }
+
+        function clearEditor() {
+            const editor = document.getElementById('sql-editor-input');
+            editor.value = '';
+            editor.focus();
+        }
+
+        // Ctrl+Enter or Cmd+Enter shortcut to run SQL
+        document.addEventListener('keydown', function (e) {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+                e.preventDefault();
+                executeCurrentSQL();
+            }
+        });
+
+        window.onload = function () {
+            initAlaSQLDatabase();
+        };
+    </script>
+</body>
+</html>
